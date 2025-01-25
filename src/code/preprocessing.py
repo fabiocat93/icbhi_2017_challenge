@@ -60,6 +60,9 @@ def process_audio_file(
     filepath: str,
     output_folder: str,
     resample_rate: int,
+    lowcut: float,
+    highcut: float,
+    order: int,
 ) -> None:
     """Processes a single audio file: resamples, normalizes, and segments it."""
     try:
@@ -88,6 +91,23 @@ def process_audio_file(
         # Resample audio
         waveform = resample_audios(waveform, sampling_rate, resample_rate)
 
+        # Apply filters
+        if lowcut is not None and lowcut > 0:
+            sos = signal.butter(
+                order, lowcut, btype="low", output="sos", fs=resample_rate
+            )
+            waveform = torch.from_numpy(
+                signal.sosfiltfilt(sos, waveform.numpy())
+            ).float()
+
+        if highcut is not None:
+            sos = signal.butter(
+                order, highcut, btype="high", output="sos", fs=resample_rate
+            )
+            waveform = torch.from_numpy(
+                signal.sosfiltfilt(sos, waveform.numpy())
+            ).float()
+
         # Normalize audio
         waveform = normalize_audio(waveform)
 
@@ -102,7 +122,12 @@ def process_audio_file(
 
 
 def process_audio_folder(
-    input_folder: str, output_folder: str, resample_rate: int
+    input_folder: str,
+    output_folder: str,
+    resample_rate: int,
+    lowcut: float,
+    highcut: float,
+    order: int,
 ) -> None:
     """Processes all .wav files in the folder and its subfolders."""
     # Collect all .wav files
@@ -114,7 +139,9 @@ def process_audio_folder(
 
     # Process files with progress bar
     for filepath in tqdm(file_paths, desc="Processing audio files"):
-        process_audio_file(filepath, output_folder, resample_rate)
+        process_audio_file(
+            filepath, output_folder, resample_rate, lowcut, highcut, order
+        )
 
 
 if __name__ == "__main__":
@@ -137,11 +164,36 @@ if __name__ == "__main__":
         default=16000,
         help="Target sampling rate for resampling.",
     )
+    parser.add_argument(
+        "--lowcut",
+        type=float,
+        default=0,
+        help="Low-pass filter cutoff frequency.",
+    )
+    parser.add_argument(
+        "--order",
+        type=int,
+        default=4,
+        help="Butterworth filter order.",
+    )
+    parser.add_argument(
+        "--highcut",
+        type=float,
+        default=4000,
+        help="High-pass filter cutoff frequency.",
+    )
 
     args = parser.parse_args()
 
     input_folder = args.input_folder
-    output_folder = args.output_folder
     resample_rate = args.resample_rate
+    lowcut = args.lowcut
+    highcut = args.highcut
+    order = args.order
+    output_folder = (
+        f"{args.output_folder}__{resample_rate}__{lowcut}__{highcut}__{order}"
+    )
 
-    process_audio_folder(input_folder, output_folder, resample_rate)
+    process_audio_folder(
+        input_folder, output_folder, resample_rate, lowcut, highcut, order
+    )

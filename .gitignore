@@ -175,3 +175,4 @@ output/
 .DS_Store
 training_results/
 data/
+data.zip

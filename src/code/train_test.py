@@ -333,8 +333,20 @@ def parse_args():
     parser.add_argument(
         "--high_pass_cutoff",
         type=int,
-        default=16000,
+        default=4000,
         help="High-pass filter cutoff frequency.",
+    )
+    parser.add_argument(
+        "--low_pass_cutoff",
+        type=int,
+        default=0,
+        help="Low-pass filter cutoff frequency.",
+    )
+    parser.add_argument(
+        "--order",
+        type=int,
+        default=4,
+        help="Order of the Butterworth filter.",
     )
     parser.add_argument(
         "--pretrained_model_id",
@@ -393,6 +405,8 @@ def main():
     # Parse arguments
     args = parse_args()
     high_pass_cutoff = args.high_pass_cutoff
+    low_pass_cutoff = args.low_pass_cutoff
+    order = args.order
     pretrained_model_id = args.pretrained_model_id
     max_epochs = args.max_epochs
     augmentation_flag = args.augmentation_flag
@@ -404,6 +418,8 @@ def main():
     save_model = args.save_model
 
     print("High-pass cutoff frequency:", high_pass_cutoff)
+    print("Low-pass cutoff frequency:", low_pass_cutoff)
+    print("Order of the Butterworth filter:", order)
     print("Pretrained model ID:", pretrained_model_id)
     print("Maximum epochs:", max_epochs)
     print("Data augmentation flag:", augmentation_flag)
@@ -415,7 +431,7 @@ def main():
     print("Save model:", save_model)
 
     # Initialize all variables
-    experiment_name = f"audio_classification_experiment__{high_pass_cutoff}__{pretrained_model_id.replace('/', '_')}"
+    experiment_name = f"audio_classification_experiment__16000__{low_pass_cutoff}__{high_pass_cutoff}__{order}__{pretrained_model_id.replace('/', '_')}"
     wandb_logger = WandbLogger(
         project="audio_classification", name=experiment_name, save_dir="../../wandb"
     )
@@ -424,7 +440,7 @@ def main():
     os.makedirs(training_results_dir, exist_ok=True)
 
     # File paths and splits
-    dataset_path = f"../../output/preprocessed_{high_pass_cutoff}"
+    dataset_path = f"../../output/preprocessed__16000__{low_pass_cutoff}__{high_pass_cutoff}__{order}"
     split_file = "../../output/split.csv"
     split_df = pd.read_csv(split_file)
 
