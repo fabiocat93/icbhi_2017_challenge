@@ -8,6 +8,7 @@ import os
 import json
 import time
 from typing import Tuple, Dict, List, Any
+import seaborn as sns
 
 import torch
 import torchaudio
@@ -252,71 +253,96 @@ class AudioClassificationModel(pl.LightningModule, PyTorchModelHubMixin):
         for output in self.test_outputs:
             logits = output["logits"]
             labels = output["labels"]
-            preds = torch.sigmoid(logits).cpu().numpy()
+            preds = torch.sigmoid(logits).cpu().numpy()  # Raw probabilities
             y_true.extend(labels.cpu().numpy())
-            y_pred.extend(preds > 0.5)
+            y_pred.extend(preds)
 
         y_true = np.array(y_true)
         y_pred = np.array(y_pred)
 
-        # Metrics
-        f1 = f1_score(y_true, y_pred, average="macro")
-        precision = precision_score(y_true, y_pred, average="macro")
-        recall = recall_score(y_true, y_pred, average="macro")
-        try:
-            auc = roc_auc_score(y_true, y_pred, average="macro")
-        except ValueError as e:
-            print(f"Unable to compute AUC: {e}")
-            auc = 0.0
+        # Apply threshold for binary predictions
+        y_pred_binary = (y_pred > 0.5).astype(int)
 
-        # Logging metrics
-        self.log("test_f1", f1)
-        self.log("test_precision", precision)
-        self.log("test_recall", recall)
-        self.log("test_auc", auc)
+        # Metrics per label
+        f1_per_label = f1_score(y_true, y_pred_binary, average=None)
+        precision_per_label = precision_score(y_true, y_pred_binary, average=None)
+        recall_per_label = recall_score(y_true, y_pred_binary, average=None)
+        try:
+            auroc_per_label = [
+                roc_auc_score(y_true[:, i], y_pred[:, i])
+                for i in range(y_true.shape[1])
+            ]
+        except ValueError as e:
+            print(f"Unable to compute AUROC for some labels: {e}")
+            auroc_per_label = [0.0] * y_true.shape[1]
+
+        # Aggregated metrics (macro and micro)
+        f1_macro = f1_score(y_true, y_pred_binary, average="macro")
+        precision_macro = precision_score(y_true, y_pred_binary, average="macro")
+        recall_macro = recall_score(y_true, y_pred_binary, average="macro")
+        f1_micro = f1_score(y_true, y_pred_binary, average="micro")
+        precision_micro = precision_score(y_true, y_pred_binary, average="micro")
+        recall_micro = recall_score(y_true, y_pred_binary, average="micro")
+
+        try:
+            auc_macro = roc_auc_score(y_true, y_pred, average="macro")
+            auc_micro = roc_auc_score(y_true, y_pred, average="micro")
+        except ValueError as e:
+            print(f"Unable to compute aggregated AUROC: {e}")
+            auc_macro = 0.0
+            auc_micro = 0.0
+
+        # Log aggregated metrics
+        self.log("test_f1_macro", f1_macro)
+        self.log("test_precision_macro", precision_macro)
+        self.log("test_recall_macro", recall_macro)
+        self.log("test_f1_micro", f1_micro)
+        self.log("test_precision_micro", precision_micro)
+        self.log("test_recall_micro", recall_micro)
+        self.log("test_auc_macro", auc_macro)
+        self.log("test_auc_micro", auc_micro)
 
         # Save metrics to JSON
         metrics = {
-            "f1_score": f1,
-            "precision": precision,
-            "recall": recall,
-            "roc_auc": auc,
+            "label_specific": {
+                f"label_{i}": {
+                    "f1_score": f1_per_label[i],
+                    "precision": precision_per_label[i],
+                    "recall": recall_per_label[i],
+                    "roc_auc": auroc_per_label[i],
+                }
+                for i in range(y_true.shape[1])
+            },
+            "aggregated_macro": {
+                "f1_score": f1_macro,
+                "precision": precision_macro,
+                "recall": recall_macro,
+                "roc_auc": auc_macro,
+            },
+            "aggregated_micro": {
+                "f1_score": f1_micro,
+                "precision": precision_micro,
+                "recall": recall_micro,
+                "roc_auc": auc_micro,
+            },
         }
-        os.makedirs(
-            os.path.join(self.training_results_dir, "evaluation"), exist_ok=True
-        )
-        metrics_path = os.path.join(
-            self.training_results_dir, "evaluation", "test_metrics.json"
-        )
-        with open(metrics_path, "w") as f:
+        results_dir = os.path.join(self.training_results_dir, "evaluation")
+        os.makedirs(results_dir, exist_ok=True)
+
+        with open(os.path.join(results_dir, "test_metrics.json"), "w") as f:
             json.dump(metrics, f)
 
-        # Save predictions to JSON
-        predictions = {
-            "true_labels": y_true.tolist(),
-            "predicted_labels": y_pred.tolist(),
-        }
-        predictions_path = os.path.join(
-            self.training_results_dir, "evaluation", "test_predictions.json"
-        )
-        with open(predictions_path, "w") as f:
-            json.dump(predictions, f)
+        # Confusion Matrices (combined in one image)
+        fig, axs = plt.subplots(1, y_true.shape[1], figsize=(12, 6))
+        for i in range(y_true.shape[1]):
+            cm = confusion_matrix(y_true[:, i], y_pred_binary[:, i])
+            sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False, ax=axs[i])
+            axs[i].set_title(f"Confusion Matrix for Label {i}")
+            axs[i].set_xlabel("Predicted")
+            axs[i].set_ylabel("True")
 
-        # Confusion Matrix
-        cm = confusion_matrix(y_true.argmax(axis=1), y_pred.argmax(axis=1))
-        fig, ax = plt.subplots(figsize=(8, 6))
-        im = ax.imshow(cm, interpolation="nearest", cmap="Blues")
-        ax.set_title("Confusion Matrix")
-        fig.colorbar(im, ax=ax)  # Associate the colorbar with the image
-        plt.xlabel("Predicted Labels")
-        plt.ylabel("True Labels")
-
-        # Save confusion matrix to specified directory
-        os.makedirs(self.training_results_dir, exist_ok=True)
-        save_path = os.path.join(
-            self.training_results_dir, "evaluation", "confusion_matrix.png"
-        )
-        plt.savefig(save_path)
+        plt.tight_layout()
+        plt.savefig(os.path.join(results_dir, "confusion_matrices.png"))
         plt.close(fig)
 
     def configure_optimizers(self):
