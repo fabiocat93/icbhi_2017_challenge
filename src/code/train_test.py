@@ -34,8 +34,12 @@ import argparse
 from huggingface_hub import PyTorchModelHubMixin
 from optimum.onnxruntime import ORTModelForAudioClassification
 import onnxruntime as ort
+from collections import Counter
+import random
+import torch
+import torchaudio
 
-
+'''
 # %%
 class AudioDataset(torch.utils.data.Dataset):
     """
@@ -91,11 +95,191 @@ class AudioDataset(torch.utils.data.Dataset):
             print(f"Error processing {audio_path}: {e}")
             print(waveform.shape, sr)
         return inputs.input_values.squeeze(0), label
+'''
+
+class AudioDataset(torch.utils.data.Dataset):
+    """
+    Custom dataset for loading, processing, balancing, and augmenting audio files for multi-label classification.
+
+    Attributes:
+        file_paths (list): List of file paths to audio files.
+        labels (list): Corresponding labels for crackle_flag and wheeze_flag.
+        processor: Transformer processor for feature extraction.
+        augment: Optional audio augmentation pipeline.
+        balance_classes (bool): Whether to balance classes.
+        augment_factor (int): Factor by which to increase dataset size after balancing.
+    """
+
+    def __init__(
+        self,
+        file_paths: list,
+        labels: list,
+        processor,
+        augment=None,
+        win_length=25,
+        balance_classes=False,
+        augment_factor=1,  # Multiplier for increasing dataset size
+    ):
+        self.file_paths = file_paths
+        self.labels = labels
+        self.processor = processor
+        self.augment = augment
+        self.balance_classes = balance_classes
+        self.augment_factor = augment_factor
+
+        try:
+            self.min_length = win_length / 1000 * processor.sampling_rate
+        except Exception:
+            self.min_length = (
+                win_length / 1000 * processor.feature_extractor.sampling_rate
+            )
+
+        if self.balance_classes:
+            print([Counter(tuple(label) for label in self.labels)])
+            self._balance_individual_labels()
+            print([Counter(tuple(label) for label in self.labels)])
+        if self.augment_factor > 1:
+            self._increase_data()
+
+    def _balance_individual_labels(self):
+        """
+        Balances binary values in each label independently by generating new samples
+        where the label is the logical union (max) of two selected labels.
+        """
+        # Count the occurrences of each binary value in label[0] and label[1]
+        label1_counts = Counter(label[0] for label in self.labels)
+        label2_counts = Counter(label[1] for label in self.labels)
+
+        # Determine the maximum count for each label
+        max_label1 = max(label1_counts.values())
+        max_label2 = max(label2_counts.values())
+
+        augmented_file_paths = []
+        augmented_labels = []
+
+        # Balance for label[0]
+        for value in [0, 1]:
+            while label1_counts[value] < max_label1:
+                # Select one sample with the current value for label[0]
+                idx1 = random.choice(
+                    [i for i, lbl in enumerate(self.labels) if lbl[0] == value]
+                )
+                # Select another random sample
+                idx2 = random.randint(0, len(self.file_paths) - 1)
+
+                # Compute the logical union (max) of the labels
+                new_label = [
+                    max(self.labels[idx1][0], self.labels[idx2][0]),
+                    max(self.labels[idx1][1], self.labels[idx2][1]),
+                ]
+
+                augmented_file_paths.append((self.file_paths[idx1], self.file_paths[idx2]))
+                augmented_labels.append(new_label)
+                label1_counts[value] += 1
+
+        # Balance for label[1]
+        for value in [0, 1]:
+            while label2_counts[value] < max_label2:
+                # Select one sample with the current value for label[1]
+                idx1 = random.choice(
+                    [i for i, lbl in enumerate(self.labels) if lbl[1] == value]
+                )
+                # Select another random sample
+                idx2 = random.randint(0, len(self.file_paths) - 1)
+
+                # Compute the logical union (max) of the labels
+                new_label = [
+                    max(self.labels[idx1][0], self.labels[idx2][0]),
+                    max(self.labels[idx1][1], self.labels[idx2][1]),
+                ]
+    
+                augmented_file_paths.append((self.file_paths[idx1], self.file_paths[idx2]))
+                augmented_labels.append(new_label)
+                label2_counts[value] += 1
+
+        # Extend the dataset with the augmented data
+        self.file_paths.extend(augmented_file_paths)
+        self.labels.extend(augmented_labels)
+
+    def _increase_data(self):
+        """
+        Further increases the dataset size by augmenting data beyond balancing.
+        """
+        additional_file_paths = []
+        additional_labels = []
+
+        for _ in range(self.augment_factor - 1):  # Repeat augmentation for the given factor
+            for idx in range(len(self.file_paths)):
+                if isinstance(self.file_paths[idx], tuple):
+                    # Extract file paths and find their indices
+                    file1, file2 = self.file_paths[idx]
+                    idx1 = self.file_paths.index(file1)
+                    idx2 = self.file_paths.index(file2)
+                else:
+                    # Randomly sample two indices for augmentation
+                    idx1, idx2 = random.sample(range(len(self.file_paths)), 2)
+
+                # Retrieve labels and compute logical OR
+                label1 = torch.tensor(self.labels[idx1])
+                label2 = torch.tensor(self.labels[idx2])
+                new_label = torch.max(label1, label2).tolist()
+
+                # Add augmented file paths and labels
+                additional_file_paths.append((self.file_paths[idx1], self.file_paths[idx2]))
+                additional_labels.append(new_label)
+
+        # Extend dataset with new augmented data
+        self.file_paths.extend(additional_file_paths)
+        self.labels.extend(additional_labels)
+
+    def __len__(self) -> int:
+        return len(self.file_paths)
+
+    def __getitem__(self, idx: int):
+        if isinstance(self.file_paths[idx], tuple):  # Augmented pair
+            audio_path1, audio_path2 = self.file_paths[idx]
+            waveform1, sr1 = torchaudio.load(audio_path1)
+            waveform2, sr2 = torchaudio.load(audio_path2)
+
+            if sr1 != sr2:
+                raise ValueError("Sampling rates of paired audio files do not match.")
+
+            waveform1 = waveform1.mean(dim=0).unsqueeze(0)
+            waveform2 = waveform2.mean(dim=0).unsqueeze(0)
+            waveform = torch.cat([waveform1, waveform2], dim=-1)
+            sr = sr1
+        else:
+            audio_path = self.file_paths[idx]
+            waveform, sr = torchaudio.load(audio_path)
+            waveform = waveform.mean(dim=0).unsqueeze(0)
+
+        label = torch.tensor(self.labels[idx], dtype=torch.float32)
+
+        while waveform.size(-1) < self.min_length:
+            waveform = torch.cat([waveform, waveform], dim=-1)
+
+        if self.augment:
+            waveform = waveform.unsqueeze(0)
+            waveform = self.augment(samples=waveform, sample_rate=sr)
+
+        try:
+            inputs = self.processor(
+                waveform.squeeze(),
+                sampling_rate=sr,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+            )
+        except Exception as e:
+            print(f"Error processing audio: {e}")
+            print(waveform.shape, sr)
+
+        return inputs.input_values.squeeze(0), label
+
 
 
 class AudioClassificationModel(pl.LightningModule, PyTorchModelHubMixin):
     """
-    # TODO: add metadata
     LightningModule for audio classification using a pre-trained Transformer model.
 
     Attributes:
@@ -130,7 +314,7 @@ class AudioClassificationModel(pl.LightningModule, PyTorchModelHubMixin):
         self.push_to_hub_flag = push_to_hub
         print("Frozen model layers:")
         for name, param in self.model.named_parameters():
-            if "embeddings" in name or frozen:
+            if not "encoder.layer.11" in name or frozen:
                 param.requires_grad = False
                 print(name)
         self.classifier = nn.Linear(self.model.config.hidden_size, num_labels)
@@ -146,6 +330,7 @@ class AudioClassificationModel(pl.LightningModule, PyTorchModelHubMixin):
         self.train_files = train_files
         self.dev_files = dev_files
         self.test_files = test_files
+        self.dropout = nn.Dropout(0.5)
 
     def on_train_start(self):
         # Record the start time of training
@@ -159,7 +344,6 @@ class AudioClassificationModel(pl.LightningModule, PyTorchModelHubMixin):
             else:
                 training_time = None
 
-            # TODO: add more info (e.g., the actual number of epochs to the metadata)
             # Collect metadata
             metadata = {
                 "training_time": training_time,
@@ -240,14 +424,15 @@ class AudioClassificationModel(pl.LightningModule, PyTorchModelHubMixin):
                 print("Model pushed to the hub successfully.")
             except Exception as e:
                 print("Error pushing the model to the hub:", e)
-
+    
     def forward(self, x):
         outputs = self.model(x).last_hidden_state
         pooled_output = outputs.mean(dim=1)
         if self.frozen_encoder:
             pooled_output = self.relu(pooled_output)
+        pooled_output = self.dropout(pooled_output)
         return self.classifier(pooled_output)
-
+    
     def training_step(self, batch, batch_idx):
         x, y = batch
         logits = self(x)
@@ -530,7 +715,7 @@ def main():
                 Gain(min_gain_in_db=-15, max_gain_in_db=15, p=0.5),
                 Shift(
                     min_shift=0.1,
-                    max_shift=0.5,
+                    max_shift=0.9,
                     shift_unit="fraction",
                     rollover=True,
                     p=0.5,
@@ -540,10 +725,34 @@ def main():
     else:
         augment = None
 
-    train_dataset = AudioDataset(train_files, train_labels, processor, augment=augment)
+
+    print("here:", len(train_files))
+    # train_dataset = AudioDataset(train_files, train_labels, processor, augment=augment)
+    train_dataset = AudioDataset(
+        train_files, 
+        train_labels, 
+        processor, 
+        augment=augment, 
+        balance_classes=True, 
+        augment_factor=1  # Increase dataset size by 3 times
+    )
+
     dev_dataset = AudioDataset(dev_files, dev_labels, processor)
     test_dataset = AudioDataset(test_files, test_labels, processor)
 
+    # Display some samples
+    print("Samples from train_dataset:")
+    for i in range(3):
+        inputs, label = train_dataset[i]
+        print(f"Sample {i}: inputs shape={inputs.shape}, label={label}")
+
+    print("\nSamples from dev_dataset:")
+    for i in range(3):
+        inputs, label = dev_dataset[i]
+        print(f"Sample {i}: inputs shape={inputs.shape}, label={label}")
+
+    print(len(train_dataset))
+    print(len(train_files))
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=batch_size,
@@ -574,16 +783,16 @@ def main():
         test_files=test_files
     )
     early_stopping = EarlyStopping(
-        monitor="val_loss", patience=3, min_delta=0.001, mode="min", verbose=True
+        monitor="val_loss", patience=3, min_delta=0.01, mode="min", verbose=True
     )
 
     trainer = pl.Trainer(
         max_epochs=max_epochs,
         precision=16,
         log_every_n_steps=10,
+        # val_check_interval=2500,
         accelerator="auto",
         devices=torch.cuda.device_count(),
-        strategy="ddp",
         logger=wandb_logger,
         callbacks=[early_stopping],
     )

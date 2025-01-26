@@ -96,7 +96,7 @@ def process_audio_file(
         # Apply filters
         if lowcut is not None and lowcut > 0:
             sos = signal.butter(
-                order, lowcut, btype="low", output="sos", fs=resample_rate
+                order, lowcut, btype="high", output="sos", fs=resample_rate
             )
             waveform = torch.from_numpy(
                 signal.sosfiltfilt(sos, waveform.numpy().copy()).copy()
@@ -104,7 +104,7 @@ def process_audio_file(
 
         if highcut is not None and highcut < resample_rate:
             sos = signal.butter(
-                order, highcut, btype="high", output="sos", fs=resample_rate
+                order, highcut, btype="low", output="sos", fs=resample_rate
             )
             waveform = torch.from_numpy(
                 signal.sosfiltfilt(sos, waveform.numpy().copy()).copy()
