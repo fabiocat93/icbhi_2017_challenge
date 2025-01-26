@@ -1,4 +1,5 @@
 """This file contains the code for training and testing the proposed model."""
+# poetry run python train_test.py --high_pass_cutoff 4000 --low_pass_cutoff 0 --order 4 --max_epochs 1 --freeze_encoder --push_to_hub --save_model
 
 # !wandb login --relogin
 # huggingface-cli login
@@ -32,6 +33,7 @@ import glob
 import argparse
 from huggingface_hub import PyTorchModelHubMixin
 from optimum.onnxruntime import ORTModelForAudioClassification
+import onnxruntime as ort
 
 
 # %%
@@ -112,11 +114,20 @@ class AudioClassificationModel(pl.LightningModule, PyTorchModelHubMixin):
         pipeline_tag="audio-classification",
         license="mit",
         tags=["audio", "classification"],
+        push_to_hub=False,
+        save_model=True,
+        max_epochs:int=20,
+        batch_size:int=16,
+        train_files=[],
+        dev_files=[],
+        test_files=[],
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.model = AutoModel.from_pretrained(model_name, trust_remote_code=True)
         self.frozen_encoder = frozen
+        self.save_model = save_model
+        self.push_to_hub_flag = push_to_hub
         print("Frozen model layers:")
         for name, param in self.model.named_parameters():
             if "embeddings" in name or frozen:
@@ -130,6 +141,11 @@ class AudioClassificationModel(pl.LightningModule, PyTorchModelHubMixin):
         self.training_start_time = None  # Track training start time
         self.pretrained_model_id = model_name  # Store the pretrained model ID
         self.learning_rate = learning_rate
+        self.max_epochs = max_epochs
+        self.batch_size = batch_size
+        self.train_files = train_files
+        self.dev_files = dev_files
+        self.test_files = test_files
 
     def on_train_start(self):
         # Record the start time of training
@@ -160,14 +176,11 @@ class AudioClassificationModel(pl.LightningModule, PyTorchModelHubMixin):
                     else None,
                 },
                 "training_params": {
-                    "batch_size": self.trainer.train_dataloader.loaders.batch_size,
+                    "batch_size": self.batch_size,
                     "learning_rate": self.learning_rate,
                     "optimizer": "Adam",
                     "loss_function": "BCEWithLogitsLoss",
-                    "max_epochs": self.trainer.max_epochs,
-                    "dataset_path": getattr(
-                        self, "dataset_path", "Unknown"
-                    ),  # Optionally set dataset_path as an attribute
+                    "max_epochs": self.max_epochs,
                     "pretrained_model_id": self.pretrained_model_id,
                 },
                 "data_split": {
@@ -195,18 +208,28 @@ class AudioClassificationModel(pl.LightningModule, PyTorchModelHubMixin):
             # Initialize and push the ONNX model repository
             repo_id = "fabiocat/icbhi_classification-onnx"
             try:
+                print("exporting")
                 model = ORTModelForAudioClassification.from_pretrained(
                     self.pretrained_model_id,
                     export=True,
                 )
+                print("exported")
+                print("pushing")
                 model.save_pretrained(
-                    onnx_export_dir, push_to_hub=self.push_to_hub, repository_id=repo_id
+                    onnx_export_dir, push_to_hub=self.push_to_hub_flag, repository_id=repo_id
                 )
+                print("pushed")
+                session_options = ort.SessionOptions()
+                session_options.intra_op_num_threads = 1  # Set the number of threads for intra-op parallelism
+                session_options.inter_op_num_threads = 1  # Set the number of threads for inter-op parallelism
+
+                # Use the session options when creating an inference session
+                session = ort.InferenceSession(os.path.join(onnx_export_dir, "model.onnx"), sess_options=session_options)
                 print("Model exported to ONNX format successfully.")
             except Exception as e:
                 print("Error exporting model to ONNX format:", e)
 
-        if self.push_to_hub:
+        if self.push_to_hub_flag:
             # Push to the hub
             try:
                 self.push_to_hub("fabiocat/icbhi_classification")
@@ -466,10 +489,9 @@ def main():
     os.makedirs(training_results_dir, exist_ok=True)
 
     # File paths and splits
-    dataset_path = f"../../output/preprocessed__16000__{low_pass_cutoff}__{high_pass_cutoff}__{order}"
+    dataset_path = f"../../output/16000__{low_pass_cutoff}__{high_pass_cutoff}__{order}"
     split_file = "../../output/split.csv"
     split_df = pd.read_csv(split_file)
-
     train_files, train_labels, dev_files, dev_labels, test_files, test_labels = (
         [],
         [],
@@ -545,6 +567,11 @@ def main():
         learning_rate=learning_rate,
         push_to_hub=push_to_hub,
         save_model=save_model,
+        batch_size=batch_size,
+        max_epochs=max_epochs,
+        train_files=train_files,
+        dev_files=dev_files,
+        test_files=test_files
     )
     early_stopping = EarlyStopping(
         monitor="val_loss", patience=3, min_delta=0.001, mode="min", verbose=True
@@ -555,7 +582,7 @@ def main():
         precision=16,
         log_every_n_steps=10,
         accelerator="auto",
-        devices=None,
+        devices=torch.cuda.device_count(),
         strategy="ddp",
         logger=wandb_logger,
         callbacks=[early_stopping],

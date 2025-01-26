@@ -1,3 +1,5 @@
+# poetry run python audio_summary.py --input_folder ../../data/ICBHI_final_database/labels/ --output_folder ../../output
+
 import os
 import torch
 import torchaudio

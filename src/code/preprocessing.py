@@ -1,3 +1,5 @@
+# poetry run python preprocessing.py --input_folder ../../data/ICBHI_final_database/labels/ --output_folder ../../output/ --resample_rate 16000 --highcut 4000 --order 4
+
 import os
 import torch
 from tqdm import tqdm
@@ -23,7 +25,7 @@ def resample_audios(
     channels = []
     for channel in waveform:
         filtered_channel = torch.from_numpy(
-            signal.sosfiltfilt(sos, channel.numpy()).copy()
+            signal.sosfiltfilt(sos, channel.numpy().copy()).copy()
         ).float()
         resampler = Resample(orig_freq=sampling_rate, new_freq=resample_rate)
         resampled_channel = resampler(filtered_channel.unsqueeze(0)).squeeze(0)
@@ -49,7 +51,7 @@ def segment_audio(
     for i, (start, end, abnomaly1, abnomaly2) in enumerate(segments):
         start_sample = int(start * sampling_rate)
         end_sample = int(end * sampling_rate)
-        segment = waveform[:, start_sample:end_sample]
+        segment = waveform[:, start_sample:end_sample].clone()
         segment_filename = os.path.join(
             output_path, f"{base_filename}__{i}__{abnomaly1}__{abnomaly2}.wav"
         )
@@ -97,15 +99,15 @@ def process_audio_file(
                 order, lowcut, btype="low", output="sos", fs=resample_rate
             )
             waveform = torch.from_numpy(
-                signal.sosfiltfilt(sos, waveform.numpy())
+                signal.sosfiltfilt(sos, waveform.numpy().copy()).copy()
             ).float()
 
-        if highcut is not None:
+        if highcut is not None and highcut < resample_rate:
             sos = signal.butter(
                 order, highcut, btype="high", output="sos", fs=resample_rate
             )
             waveform = torch.from_numpy(
-                signal.sosfiltfilt(sos, waveform.numpy())
+                signal.sosfiltfilt(sos, waveform.numpy().copy()).copy()
             ).float()
 
         # Normalize audio
@@ -166,7 +168,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--lowcut",
-        type=float,
+        type=int,
         default=0,
         help="Low-pass filter cutoff frequency.",
     )
@@ -178,7 +180,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--highcut",
-        type=float,
+        type=int,
         default=4000,
         help="High-pass filter cutoff frequency.",
     )
@@ -190,8 +192,8 @@ if __name__ == "__main__":
     lowcut = args.lowcut
     highcut = args.highcut
     order = args.order
-    output_folder = (
-        f"{args.output_folder}__{resample_rate}__{lowcut}__{highcut}__{order}"
+    output_folder = os.path.join(
+        args.output_folder, f"{resample_rate}__{lowcut}__{highcut}__{order}"
     )
 
     process_audio_folder(

@@ -176,3 +176,4 @@ output/
 training_results/
 data/
 data.zip
+wandb/
