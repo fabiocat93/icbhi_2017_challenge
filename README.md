@@ -1,5 +1,7 @@
 # icbhi_2017_challenge
 This repository provides code for pre-processing, training, and testing a model to classify respiratory cycles from the ICBHI 2017 Challenge dataset. It predicts the presence of crackles, wheezes, or both.
+For some detailed notes on the design choices and the process, please check [this notebook](docs/notes.md). 
+For the model, please visit [HuggingFace](https://huggingface.co/fabiocat/icbhi_classification).
 
 ## Repo structure
 ```
@@ -27,7 +29,7 @@ icbhi_2017_challenge/
 4. **`s03_train_dev_test_split.py`**  
    Splits the dataset into training, development, and testing sets based on configurable criteria.
 5. **`s04_ml_pipeline.py`**  
-   Implements a complete machine learning pipeline, including model training and evaluation. For some notes on this, please check [this notebook](docs/notes.md). 
+   Implements a complete machine learning pipeline, including model training and evaluation.
 6. **`s05_inference.py`**  
    Performs inference using trained models on new audio data.
 
