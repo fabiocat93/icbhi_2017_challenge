@@ -24,7 +24,7 @@ I decided to focus on scenario 3. It combines both tasks 1 and 2 and can provide
   - I used an AST encoder (`MIT/ast-finetuned-audioset-14-14-0.443`) with this simple head (mean pooling, relu, dropout, and linear classifier).
   - I froze the encoder completely. Partial freezing caused overfitting, probably due to the small dataset and limited variability.
   - I evaluated AUDIOMAE as an alternative encoder but saw no significant performance difference, so I kept the AST encoder for simplicity. AST processes mel-spectrograms, which mimic the human auditory system (logarithmic frequency bands). Since this is not proper speech (no words), I wanted a model focusing on spectral variations rather than language features.
-  - As loss function, I used nn.BCEWithLogitsLoss(), which is good for multi-label classification because it handles independent binary predictions for each label.
+  - As loss function, I used `nn.BCEWithLogitsLoss()`, which is good for multi-label classification because it handles independent binary predictions for each label.
   - I applied different types of data augmentation (both showed some improvements in the performance and robustness of the model):
     -  Signal processing-based: gain adjustment and time shifting.
     -  Concatenation-based: I concatenated cycles to increase data for positive wheeze labels.
