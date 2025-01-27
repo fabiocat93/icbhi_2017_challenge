@@ -1,4 +1,10 @@
-# poetry run python audio_summary.py --input_folder ../../data/ICBHI_final_database/labels/ --output_folder ../../output
+"""
+This script processes audio files in .wav format to extract metadata and filename-related information.
+It generates a CSV file summarizing the audio properties and additional metadata derived from filenames.
+
+Usage:
+    poetry run python s00_audio_summary.py --input_folder ../../data/audio_files --output_folder ../../output
+"""
 
 import os
 import torch
@@ -120,7 +126,7 @@ def process_audio_folder(input_folder: str, output_folder: str) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Extract audio metadata from .wav files."
+        description="Extract audio- and filename-related metadata from .wav files."
     )
     parser.add_argument(
         "--input_folder",
@@ -130,7 +136,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output_folder",
         type=str,
-        help="Path to the folder to save the output CSV file.",
+        help="Path to the folder to save the output CSV file with all the aggregated info.",
     )
 
     args = parser.parse_args()

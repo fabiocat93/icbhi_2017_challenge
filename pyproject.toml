@@ -1,13 +1,14 @@
 [tool.poetry]
 name = "icbhi-2017-challenge"
 version = "0.1.0"
-description = "Classification of respiratory sounds using the ICBHI 2017 challenge dataset"
-authors = ["fabiocat93 <fabio-cat93@hotmail.it>"]
+description = "Some code for the classification of respiratory sounds using the ICBHI 2017 challenge dataset."
+authors = ["fabiocat93 <fabiocat@mit.edu>"]
 license = "MIT"
 readme = "README.md"
 homepage = "https://github.com/fabiocat93/icbhi_2017_challenge"
 repository = "https://github.com/fabiocat93/icbhi_2017_challenge"
 packages = [{include = "code", from = "src"}]
+keywords = ["respiratory sounds", "ICBHI 2017", "classification", "deep learning", "machine learning"]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
@@ -29,10 +30,7 @@ timm = "~=1.0"
 numpy = "~=2.1"
 torch-audiomentations = "~=0.12"
 huggingface-hub = "~=0.27"
-optimum = "~=1.23"
-onnxruntime = "~=1.20"
-onnx = "~=1.17"
-seaborn = "^0.13.2"
+seaborn = "~=0.13"
 
 [tool.poetry.group.dev]
 optional = true
@@ -53,6 +51,14 @@ optional = true
 
 [tool.poetry.group.docs.dependencies]
 pdoc = "~=15.0"
+
+[tool.pytest.ini_options]
+pythonpath = [
+  "src"
+]
+testpaths = [
+  "src/tests"
+]
 
 [build-system]
 requires = ["poetry-core"]

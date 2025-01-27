@@ -1,9 +1,17 @@
-# poetry run python preprocessing.py --input_folder ../../data/ICBHI_final_database/labels/ --output_folder ../../output/ --resample_rate 16000 --highcut 4000 --order 4
+"""
+This script processes audio files in a specified folder by resampling, normalizing,
+filtering, and segmenting them based on provided segmentation files. It saves
+the processed audio segments in the output folder.
+
+Usage:
+    poetry run python s02_preprocessing.py --input_folder ../../data/ICBHI_final_database/labels/ \
+    --output_folder ../../output/ --resample_rate 16000 --highcut 4000 --order 4
+"""
 
 import os
 import torch
 from tqdm import tqdm
-from typing import Optional
+from typing import Optional, List, Tuple
 from scipy import signal
 from speechbrain.augment.time_domain import Resample
 import torchaudio
@@ -17,7 +25,19 @@ def resample_audios(
     lowcut: Optional[float] = None,
     order: int = 4,
 ) -> torch.Tensor:
-    """Resamples an audio waveform to the target sampling rate with optional low-pass filtering."""
+    """
+    Resamples an audio waveform to a target sampling rate with optional low-pass filtering.
+
+    Args:
+        waveform (torch.Tensor): The audio waveform as a PyTorch tensor.
+        sampling_rate (int): Original sampling rate of the audio.
+        resample_rate (int): Target sampling rate.
+        lowcut (Optional[float]): Low-pass filter cutoff frequency. Defaults to resample_rate / 2 - 100.
+        order (int): Butterworth filter order.
+
+    Returns:
+        torch.Tensor: Resampled waveform.
+    """
     if lowcut is None:
         lowcut = resample_rate / 2 - 100
     sos = signal.butter(order, lowcut, btype="low", output="sos", fs=resample_rate)
@@ -31,29 +51,45 @@ def resample_audios(
         resampled_channel = resampler(filtered_channel.unsqueeze(0)).squeeze(0)
         channels.append(resampled_channel)
 
-    resampled_waveform = torch.stack(channels)
-    return resampled_waveform
+    return torch.stack(channels)
 
 
 def normalize_audio(waveform: torch.Tensor) -> torch.Tensor:
-    """Normalizes an audio waveform to the range [-1, 1]."""
+    """
+    Normalizes an audio waveform to the range [-1, 1].
+
+    Args:
+        waveform (torch.Tensor): The audio waveform as a PyTorch tensor.
+
+    Returns:
+        torch.Tensor: Normalized waveform.
+    """
     return waveform / waveform.abs().max()
 
 
 def segment_audio(
     waveform: torch.Tensor,
     sampling_rate: int,
-    segments: list,
+    segments: List[Tuple[float, float, int, int]],
     output_path: str,
     base_filename: str,
 ) -> None:
-    """Segments audio based on start and end times from a segmentation list."""
-    for i, (start, end, abnomaly1, abnomaly2) in enumerate(segments):
+    """
+    Segments audio based on start and end times and saves them as separate files.
+
+    Args:
+        waveform (torch.Tensor): The audio waveform as a PyTorch tensor.
+        sampling_rate (int): Sampling rate of the audio.
+        segments (List[Tuple[float, float, int, int]]): List of segments (start, end, anomaly1, anomaly2).
+        output_path (str): Path to save the segmented audio files.
+        base_filename (str): Base name for the segmented files.
+    """
+    for i, (start, end, anomaly1, anomaly2) in enumerate(segments):
         start_sample = int(start * sampling_rate)
         end_sample = int(end * sampling_rate)
         segment = waveform[:, start_sample:end_sample].clone()
         segment_filename = os.path.join(
-            output_path, f"{base_filename}__{i}__{abnomaly1}__{abnomaly2}.wav"
+            output_path, f"{base_filename}__{i}__{anomaly1}__{anomaly2}.wav"
         )
         torchaudio.save(segment_filename, segment, sampling_rate)
 
@@ -66,9 +102,18 @@ def process_audio_file(
     highcut: float,
     order: int,
 ) -> None:
-    """Processes a single audio file: resamples, normalizes, and segments it."""
+    """
+    Processes a single audio file: resamples, normalizes, and segments it.
+
+    Args:
+        filepath (str): Path to the audio file.
+        output_folder (str): Directory to save the processed audio files.
+        resample_rate (int): Target sampling rate.
+        lowcut (float): Low-pass filter cutoff frequency.
+        highcut (float): High-pass filter cutoff frequency.
+        order (int): Butterworth filter order.
+    """
     try:
-        # Load audio and get corresponding segmentation file
         waveform, sampling_rate = torchaudio.load(filepath)
         base_filename = os.path.splitext(os.path.basename(filepath))[0]
         segmentation_file = os.path.join(
@@ -78,7 +123,6 @@ def process_audio_file(
             print(f"Segmentation file not found for {filepath}. Skipping.")
             return
 
-        # Parse segmentation file
         with open(segmentation_file, "r") as f:
             segments = [
                 (
@@ -90,11 +134,9 @@ def process_audio_file(
                 for line in f.readlines()
             ]
 
-        # Resample audio
         waveform = resample_audios(waveform, sampling_rate, resample_rate)
 
-        # Apply filters
-        if lowcut is not None and lowcut > 0:
+        if lowcut > 0:
             sos = signal.butter(
                 order, lowcut, btype="high", output="sos", fs=resample_rate
             )
@@ -102,7 +144,7 @@ def process_audio_file(
                 signal.sosfiltfilt(sos, waveform.numpy().copy()).copy()
             ).float()
 
-        if highcut is not None and highcut < resample_rate:
+        if highcut < resample_rate:
             sos = signal.butter(
                 order, highcut, btype="low", output="sos", fs=resample_rate
             )
@@ -110,13 +152,8 @@ def process_audio_file(
                 signal.sosfiltfilt(sos, waveform.numpy().copy()).copy()
             ).float()
 
-        # Normalize audio
         waveform = normalize_audio(waveform)
-
-        # Create output directory
         os.makedirs(output_folder, exist_ok=True)
-
-        # Segment and save
         segment_audio(waveform, resample_rate, segments, output_folder, base_filename)
 
     except Exception as e:
@@ -131,15 +168,24 @@ def process_audio_folder(
     highcut: float,
     order: int,
 ) -> None:
-    """Processes all .wav files in the folder and its subfolders."""
-    # Collect all .wav files
-    file_paths = []
-    for root, _, files in os.walk(input_folder):
-        for file in files:
-            if file.lower().endswith(".wav"):
-                file_paths.append(os.path.join(root, file))
+    """
+    Processes all .wav files in a folder and its subfolders.
 
-    # Process files with progress bar
+    Args:
+        input_folder (str): Path to the input folder containing .wav files.
+        output_folder (str): Path to the folder to save processed audio files.
+        resample_rate (int): Target sampling rate.
+        lowcut (float): Low-pass filter cutoff frequency.
+        highcut (float): High-pass filter cutoff frequency.
+        order (int): Butterworth filter order.
+    """
+    file_paths = [
+        os.path.join(root, file)
+        for root, _, files in os.walk(input_folder)
+        for file in files
+        if file.lower().endswith(".wav")
+    ]
+
     for filepath in tqdm(file_paths, desc="Processing audio files"):
         process_audio_file(
             filepath, output_folder, resample_rate, lowcut, highcut, order
@@ -147,18 +193,18 @@ def process_audio_folder(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Extract audio metadata from .wav files."
-    )
+    parser = argparse.ArgumentParser(description="Audio preprocessing pipeline.")
     parser.add_argument(
         "--input_folder",
         type=str,
+        required=True,
         help="Path to the input folder containing .wav files.",
     )
     parser.add_argument(
         "--output_folder",
         type=str,
-        help="Path to the folder to save the output CSV file.",
+        required=True,
+        help="Path to the folder to save processed audio files.",
     )
     parser.add_argument(
         "--resample_rate",
@@ -167,35 +213,26 @@ if __name__ == "__main__":
         help="Target sampling rate for resampling.",
     )
     parser.add_argument(
-        "--lowcut",
-        type=int,
-        default=0,
-        help="Low-pass filter cutoff frequency.",
+        "--lowcut", type=int, default=0, help="Low-pass filter cutoff frequency."
     )
     parser.add_argument(
-        "--order",
-        type=int,
-        default=4,
-        help="Butterworth filter order.",
+        "--highcut", type=int, default=4000, help="High-pass filter cutoff frequency."
     )
     parser.add_argument(
-        "--highcut",
-        type=int,
-        default=4000,
-        help="High-pass filter cutoff frequency.",
+        "--order", type=int, default=4, help="Butterworth filter order."
     )
 
     args = parser.parse_args()
 
-    input_folder = args.input_folder
-    resample_rate = args.resample_rate
-    lowcut = args.lowcut
-    highcut = args.highcut
-    order = args.order
     output_folder = os.path.join(
-        args.output_folder, f"{resample_rate}__{lowcut}__{highcut}__{order}"
+        args.output_folder,
+        f"{args.resample_rate}__{args.lowcut}__{args.highcut}__{args.order}",
     )
-
     process_audio_folder(
-        input_folder, output_folder, resample_rate, lowcut, highcut, order
+        args.input_folder,
+        output_folder,
+        args.resample_rate,
+        args.lowcut,
+        args.highcut,
+        args.order,
     )
