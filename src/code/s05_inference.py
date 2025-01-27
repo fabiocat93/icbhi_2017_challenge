@@ -177,19 +177,19 @@ def main():
         print("Invalid .wav file. Please provide a valid mono .wav file.")
         return
 
+    # Predict and print results
+    predictions = predict(args.file_path)
+    print()
+    
     if (
         args.file_path
-        == "../../output/16000__0__4000__4/130_1p2_Ar_mc_AKGC417L__4__1__1.wav"
+        == "../../res/130_1p2_Ar_mc_AKGC417L__4__1__1.wav"
     ):
         print(
             "For the given audio example, the ideal output would be: {'Crackle': 1.0, 'Wheeze': 1.0}"
         )
-        print()
 
-    # Predict and print results
-    predictions = predict(args.file_path)
-    print()
-    print("Scores:", json.dumps(predictions, indent=4))
+    print("Predicted scores:", json.dumps(predictions, indent=4))
 
 
 if __name__ == "__main__":
