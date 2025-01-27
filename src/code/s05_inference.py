@@ -1,7 +1,8 @@
 """
 This file contains the code for inference using the trained model.
 Usage:
-    poetry run python s05_inference.py --file_path ../../output/16000__0__4000__4/130_1p2_Ar_mc_AKGC417L__4__1__1.wav"""
+    poetry run python s05_inference.py --file_path ../../res/130_1p2_Ar_mc_AKGC417L__4__1__1.wav
+"""
 
 import json
 import torch
