@@ -11,6 +11,10 @@ I decided to focus on scenario 3. It combines both tasks 1 and 2 and can provide
 
 ---
 
+0. Here are some papers I found interesting and that inspired my work in different ways:
+   - https://www.isca-archive.org/interspeech_2023/bae23b_interspeech.pdf
+   - https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=9630091
+   - https://www.nature.com/articles/s41598-021-96724-7
 1. As an exploration, I analyzed the dataset using scripts `s00_audio_summary.py` and `s01_plot_spectrogram.ipynb`. Among other things, I notices that: 
    - The sampling rate of recordings varies from 4 kHz to 44.1 kHz.  
    - Some samples (especially 100% of Litt3200 device samples) had blank regions above the 2000 Hz frequency range.
@@ -91,4 +95,5 @@ I decided to focus on scenario 3. It combines both tasks 1 and 2 and can provide
 - Hyperparams optimization: Leveraging tools like Optuna for systematic hyperparameter tuning could refine training parameters, including learning rate, batch size, and dropout rates.
 - Expanding evaluation metrics: Evaluating temporal consistency of predictions across cycles (e.g., a moving average of predictions).
 - Exploring contextual info: Combining consecutive cycles or analyzing the temporal evolution of crackles and wheezes.
+- Exploring multi-modality: Including audio- and text-based encoders, as they do in [this very recent related paper](https://www.isca-archive.org/interspeech_2024/kim24f_interspeech.pdf).
 - ... (this list can be endless)
