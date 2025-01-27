@@ -1,5 +1,6 @@
 ## Notes
 
+I used the ICBHI 2017 Challenge dataset, that you can download from [here](https://bhichallenge.med.auth.gr/ICBHI_2017_Challenge).
 The data describes whether an audio clip contains anomalies or not. Hence, I framed the project as an audio classification problem. I considered four scenarios:
 1. Normal vs abnormal: A binary classification problem.
 2. Wheeze vs crackle vs both: A multi-label classification problem.
@@ -26,6 +27,7 @@ I decided to focus on scenario 3. It combines both tasks 1 and 2 and can provide
   - I froze the encoder completely. Partial freezing caused overfitting, probably due to the small dataset and limited variability.
   - I evaluated AUDIOMAE as an alternative encoder but saw no significant performance difference, so I kept the AST encoder for simplicity. AST processes mel-spectrograms, which mimic the human auditory system (logarithmic frequency bands). Since this is not proper speech (no words), I wanted a model focusing on spectral variations rather than language features.
   - As loss function, I used `nn.BCEWithLogitsLoss()`, which is good for multi-label classification because it handles independent binary predictions for each label.
+  - The best model was optimized with the Adam optimizer at a learning rate of 5e-05 and a batch size of 16, running on an NVIDIA H100 80GB GPU.
   - I applied different types of data augmentation (both showed some improvements in the performance and robustness of the model):
     -  Signal processing-based: gain adjustment and time shifting.
     -  Concatenation-based: I concatenated cycles to increase data for positive wheeze labels.
