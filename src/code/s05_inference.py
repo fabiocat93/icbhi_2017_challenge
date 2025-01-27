@@ -12,6 +12,7 @@ from pathlib import Path
 import torch.nn as nn
 from transformers import AutoModel
 import argparse
+import time
 
 from huggingface_hub import PyTorchModelHubMixin
 import pytorch_lightning as pl
@@ -113,16 +114,22 @@ def predict(file_path: str, model_path: str = "fabiocat/icbhi_classification") -
     Returns:
         dict: Prediction results.
     """
+    # Measure start time
+    total_start_time = time.time()
+
     # Load the processor and model
     print("Loading processor and model...")
+    load_start_time = time.time()
     model = FabModel.from_pretrained(model_path)
     model.eval()
+    load_end_time = time.time()
+    print(f"Processor and model loaded in {load_end_time - load_start_time:.4f} seconds.")
 
     # Load and preprocess the audio file
-    # print("Processing audio file...")
+    print("Processing audio file...")
+    preprocess_start_time = time.time()
     waveform, sr = torchaudio.load(file_path)
     waveform = waveform.mean(0).unsqueeze(0)  # Convert to mono
-
     processor = AutoProcessor.from_pretrained(model.encoder_id, trust_remote_code=True)
     inputs = processor(
         waveform.squeeze(),
@@ -131,19 +138,28 @@ def predict(file_path: str, model_path: str = "fabiocat/icbhi_classification") -
         padding=True,
         truncation=True,
     )
+    preprocess_end_time = time.time()
+    print(f"Audio file processed in {preprocess_end_time - preprocess_start_time:.4f} seconds.")
 
     # Make predictions
-    # print("Making predictions...")
+    print("Making predictions...")
+    prediction_start_time = time.time()
     with torch.no_grad():
         logits = model(inputs.input_values)
         probabilities = torch.sigmoid(logits).squeeze().tolist()
+    prediction_end_time = time.time()
+    print(f"Predictions made in {prediction_end_time - prediction_start_time:.4f} seconds.")
 
     # Prepare output
     labels = ["Crackle", "Wheeze"]  # Update based on your model's labels
     predictions = {label: prob for label, prob in zip(labels, probabilities)}
 
-    return predictions
+    # Measure total time
+    total_end_time = time.time()
+    print(f"Total time taken: {total_end_time - total_start_time:.4f} seconds.")
 
+    return predictions
+    
 
 def main():
     parser = argparse.ArgumentParser(
