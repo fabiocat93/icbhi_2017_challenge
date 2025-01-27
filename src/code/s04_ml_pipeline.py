@@ -48,7 +48,7 @@ import random
 
 class AudioDataset(torch.utils.data.Dataset):
     """
-    Custom dataset for loading, processing, and balancing audio files for multi-label classification.
+    Custom dataset for loading, processing, and augmenting audio files for multi-label classification.
 
     Attributes:
         file_paths (list): List of file paths to audio files.
@@ -56,7 +56,7 @@ class AudioDataset(torch.utils.data.Dataset):
         processor: Transformer processor for feature extraction.
         augment (optional): Audio augmentation pipeline.
         win_length (int): Minimum window length in milliseconds for audio samples.
-        balance_classes (bool): Whether to balance classes during dataset initialization.
+        concatenate_samples (bool): Whether to do concatenation-based data augmentation during dataset initialization.
     """
 
     def __init__(
@@ -102,7 +102,7 @@ class AudioDataset(torch.utils.data.Dataset):
         for idx, counter in enumerate(label_counts):
             print(f"Label[{idx}] counts: {dict(counter)}")
 
-        print(f"Tentative target counts for balancing: {max_counts}")
+        print(f"Tentative target counts for concatenation-based augmentation: {max_counts}")
 
         augmented_file_paths = []
         augmented_labels = []
@@ -710,7 +710,7 @@ def main():
         processor,
         augment=augment,
         concatenate_samples=True,
-        increase_factor=2,
+        increase_factor=1,
     )
     dev_dataset = AudioDataset(dev_files, dev_labels, processor)
     test_dataset = AudioDataset(test_files, test_labels, processor)
@@ -791,6 +791,7 @@ def main():
         y_true=torch.tensor(all_labels),
         y_pred=torch.tensor(all_logits),
         y_pred_binary=torch.tensor(all_predictions_binary),
+        labels=label_names
     )
     save_metrics(metrics, os.path.join(training_results_dir, "evaluation"))
 
