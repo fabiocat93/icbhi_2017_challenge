@@ -102,7 +102,9 @@ class AudioDataset(torch.utils.data.Dataset):
         for idx, counter in enumerate(label_counts):
             print(f"Label[{idx}] counts: {dict(counter)}")
 
-        print(f"Tentative target counts for concatenation-based augmentation: {max_counts}")
+        print(
+            f"Tentative target counts for concatenation-based augmentation: {max_counts}"
+        )
 
         augmented_file_paths = []
         augmented_labels = []
@@ -209,8 +211,8 @@ class FabModel(pl.LightningModule, PyTorchModelHubMixin):
 
     def __init__(
         self,
-        encoder_id: str,
-        num_labels: int,
+        encoder_id: str = "MIT/ast-finetuned-audioset-14-14-0.443",
+        num_labels: int = 2,
         learning_rate: float = 1e-4,
         frozen: bool = True,
     ) -> None:
@@ -219,7 +221,9 @@ class FabModel(pl.LightningModule, PyTorchModelHubMixin):
 
         Args:
             encoder_id (str): ID of the pre-trained transformer encoder.
+                Default is "MIT/ast-finetuned-audioset-14-14-0.443".
             num_labels (int): Number of output labels.
+                Default is 2.
             learning_rate (float, optional): Learning rate for the optimizer. Defaults to 1e-4.
             frozen (bool, optional): Whether to freeze the encoder layers. Defaults to True.
         """
@@ -791,7 +795,7 @@ def main():
         y_true=torch.tensor(all_labels),
         y_pred=torch.tensor(all_logits),
         y_pred_binary=torch.tensor(all_predictions_binary),
-        labels=label_names
+        labels=label_names,
     )
     save_metrics(metrics, os.path.join(training_results_dir, "evaluation"))
 
