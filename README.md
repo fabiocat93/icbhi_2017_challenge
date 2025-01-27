@@ -3,7 +3,7 @@ This repository provides code for pre-processing, training, and testing a model 
 For some detailed notes on the design choices and the process, please check [this notebook](docs/notes.md). 
 For the model, please visit [HuggingFace](https://huggingface.co/fabiocat/icbhi_classification).
 
-⚠️ This is just a first exploration. There is a lot more to analyze and improve. If you're interested, let's collaborate and maybe turn it into a paper! 🚀
+⚠️ This is just a first exploration. There is a lot more to analyze and improve. If you're interested, let's collaborate and maybe turn it into a tool or a paper! 🚀
 
 ## Repo structure
 ```
