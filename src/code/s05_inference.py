@@ -188,6 +188,7 @@ def main():
 
     # Predict and print results
     predictions = predict(args.file_path)
+    print()
     print("Scores:", json.dumps(predictions, indent=4))
 
 
