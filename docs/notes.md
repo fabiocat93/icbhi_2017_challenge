@@ -74,3 +74,14 @@ I decided to focus on scenario 3. It combines both tasks 1 and 2 and can provide
 ```
 
 ![confusion_matrices](https://github.com/user-attachments/assets/5c887d98-39df-47cc-8d6a-1439ea0d6149)
+
+---
+
+## Future work
+- Benchmarking different architectures: Exploring other pre-trained encoders (including multimodal models like CLIP) could help identify a more optimal model. 
+- Exploring different augmentations: More comprehensive augmentation strategies, such as frequency masking, may further improve robustness.
+- Error analysis: Analyzing the confusion matrices could reveal patterns in misclassification (for instance, are most false positives associated with specific types of background noise - which may depend on the location of the microphone?)
+- Hyperparams optimization: Leveraging tools like Optuna for systematic hyperparameter tuning could refine training parameters, including learning rate, batch size, and dropout rates.
+- Expanding evaluation metrics: Evaluating temporal consistency of predictions across cycles (e.g., a moving average of predictions).
+- Exploring contextual info: Combining consecutive cycles or analyzing the temporal evolution of crackles and wheezes.
+- ... (this list can be endless)
