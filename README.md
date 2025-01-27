@@ -74,5 +74,5 @@ poetry run pre-commit run --all-files
 ## Documentation
 - Generate and view code documentation:
 ```bash
-poetry run pdoc src/senselab -t docs_style/pdoc-theme --docformat google
+poetry run pdoc src/code -t docs_style/pdoc-theme --docformat google
 ```
