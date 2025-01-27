@@ -70,9 +70,6 @@ I decided to focus on **scenario 3**. It combines both tasks 1 and 2 and can pro
     "auc_micro": 0.7875
   }
 }
-
-![confusion_matrices](https://github.com/user-attachments/assets/5c887d98-39df-47cc-8d6a-1439ea0d6149)
-
 ```
 
-
+![confusion_matrices](https://github.com/user-attachments/assets/5c887d98-39df-47cc-8d6a-1439ea0d6149)
