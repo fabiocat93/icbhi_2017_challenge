@@ -15,8 +15,9 @@ I decided to focus on scenario 3. It combines both tasks 1 and 2 and can provide
    - The sampling rate of recordings varies from 4 kHz to 44.1 kHz.  
    - Some samples (especially 100% of Litt3200 device samples) had blank regions above the 2000 Hz frequency range.
    - The dataset contains 920 recordings from 126 patients, totaling 5.5 hours. Each breathing cycle is labeled by an expert into one of four classes: normal, crackle, wheeze, or both (crackle and wheeze). Cycle durations vary from 0.2s to 16.2s (average: 2.7s). The dataset is imbalanced, with 3642 normal, 1864 crackle, 886 wheeze, and 506 both-class cycles.
+   These exploratory findings guided the following preprocessing decisions, such as re-sampling and applying low-pass filtering, which improved model performance (evaluated based on validation loss).
 2. Preprocessing: 
-   - I re-sampled all recordings to 16 kHz (which is the sampling rate of the encoder I used in my model).  
+   - I re-sampled all recordings to 16 kHz (the sampling rate of the encoder I used in my model).  
    - I applied a 4th-order Butterworth low-pass filter to reduce the impact of blank regions above 2000 Hz. (Notably: this preprocessing improved the model’s performance during exploratory tests).
    - I segmented audio clips based on the ground truth in the metadata. Each segment corresponds to one respiration cycle.
 3. Train-dev-test splitting:
@@ -37,14 +38,14 @@ I decided to focus on scenario 3. It combines both tasks 1 and 2 and can provide
 <img width="1631" alt="Screenshot 2025-01-27 at 9 13 45 AM" src="https://github.com/user-attachments/assets/0507df5a-b793-4c56-a424-fdb555a8a8b2" />
 
 5. Evaluation
-  - I measured performance using F1-score, precision, recall, area under the curve (AUC), and evaluated each label separately.
+  - I measured performance using F1-score, precision, recall, area under the curve (AUC), and evaluated each label separately. These metrics ensure that both false positives and false negatives are captured (which is critical for medical applications) and take into account class imbalance. 
   - I also aggregated results using macro and micro averages.
   - The best model is available [here](https://huggingface.co/fabiocat/icbhi_classification/).
   - You can use `s05_inference.py` for inference. The script outputs scores for crackle and wheeze labels.
 
 ---
 
-## Performance:
+### Performance
 
 ```json
 {
@@ -77,9 +78,13 @@ I decided to focus on scenario 3. It combines both tasks 1 and 2 and can provide
 
 ![confusion_matrices](https://github.com/user-attachments/assets/5c887d98-39df-47cc-8d6a-1439ea0d6149)
 
+#### Quick comments
+- **Crackle**: The model shows good recall (0.75), indicating it effectively detects crackle events, but the moderate precision (0.6147) suggests a need to reduce false positives. 
+- **Wheeze**: The model achieves low recall (0.3849), which indicates it misses many true positives. It also has moderate precision (0.6565), suggesting it is cautious in labeling wheeze events. Improving recall through more targeted augmentations or balancing techniques may be the way to obtain better performance.
+
 ---
 
-## Future work
+### Future work
 - Benchmarking different architectures: Exploring other pre-trained encoders (including multimodal models like CLIP) could help identify a more optimal model. 
 - Exploring different augmentations: More comprehensive augmentation strategies, such as frequency masking, may further improve robustness.
 - Error analysis: Analyzing the confusion matrices could reveal patterns in misclassification (for instance, are most false positives associated with specific types of background noise - which may depend on the location of the microphone?)
