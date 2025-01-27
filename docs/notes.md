@@ -28,8 +28,11 @@ I decided to focus on **scenario 3**. It combines both tasks 1 and 2 and can pro
   - I applied different types of data augmentation (both showed some improvements in the performance and robustness of the model):
     -  Signal processing-based: gain adjustment and time shifting.
     -  Concatenation-based: I concatenated cycles to increase data for positive wheeze labels.
-  -  I used early stopping to avoid overfitting and tracked training loss with W&B.
   -  I didn’t optimize hyperparameters (e.g., learning rate) due to time constraints. I would use Optuna to minimize validation loss in future experiments.
+  -  I used early stopping to avoid overfitting and tracked training loss with W&B.
+
+<img width="1631" alt="Screenshot 2025-01-27 at 9 13 45 AM" src="https://github.com/user-attachments/assets/0507df5a-b793-4c56-a424-fdb555a8a8b2" />
+
 5. Evaluation
   - I measured performance using F1-score, precision, recall, area under the curve (AUC), and evaluated each label separately.
   - I also aggregated results using macro and micro averages.
@@ -67,6 +70,9 @@ I decided to focus on **scenario 3**. It combines both tasks 1 and 2 and can pro
     "auc_micro": 0.7875
   }
 }
+
+![confusion_matrices](https://github.com/user-attachments/assets/5c887d98-39df-47cc-8d6a-1439ea0d6149)
+
 ```
 
 
