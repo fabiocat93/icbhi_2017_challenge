@@ -127,7 +127,7 @@ def predict(file_path: str, model_path: str = "fabiocat/icbhi_classification") -
     print(f"Processor and model loaded in {load_end_time - load_start_time:.4f} seconds.")
 
     # Load and preprocess the audio file
-    print("Processing audio file...")
+    print("Processing audio file with AutoProcessor...")
     preprocess_start_time = time.time()
     waveform, sr = torchaudio.load(file_path)
     waveform = waveform.mean(0).unsqueeze(0)  # Convert to mono
@@ -142,14 +142,14 @@ def predict(file_path: str, model_path: str = "fabiocat/icbhi_classification") -
     preprocess_end_time = time.time()
     print(f"Audio file processed in {preprocess_end_time - preprocess_start_time:.4f} seconds.")
 
-    # Make predictions
-    print("Making predictions...")
+    # Make prediction
+    print("Making the prediction...")
     prediction_start_time = time.time()
     with torch.no_grad():
         logits = model(inputs.input_values)
         probabilities = torch.sigmoid(logits).squeeze().tolist()
     prediction_end_time = time.time()
-    print(f"Predictions made in {prediction_end_time - prediction_start_time:.4f} seconds.")
+    print(f"Prediction made in {prediction_end_time - prediction_start_time:.4f} seconds.")
 
     # Prepare output
     labels = ["Crackle", "Wheeze"]  # Update based on your model's labels
