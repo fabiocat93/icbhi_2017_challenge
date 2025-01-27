@@ -13,12 +13,13 @@ I decided to focus on scenario 3. It combines both tasks 1 and 2 and can provide
 1. As an exploration, I analyzed the dataset using scripts `s00_audio_summary.py` and `s01_plot_spectrogram.ipynb`. Among other things, I notices that: 
    - The sampling rate of recordings varies from 4 kHz to 44.1 kHz.  
    - Some samples (especially 100% of Litt3200 device samples) had blank regions above the 2000 Hz frequency range.
+   - The dataset contains 920 recordings from 126 patients, totaling 5.5 hours. Each breathing cycle is labeled by an expert into one of four classes: normal, crackle, wheeze, or both (crackle and wheeze). Cycle durations vary from 0.2s to 16.2s (average: 2.7s). The dataset is imbalanced, with 3642 normal, 1864 crackle, 886 wheeze, and 506 both-class cycles.
 2. Preprocessing: 
    - I re-sampled all recordings to 16 kHz (which is the sampling rate of the encoder I used in my model).  
    - I applied a 4th-order Butterworth low-pass filter to reduce the impact of blank regions above 2000 Hz. (Notably: this preprocessing improved the model’s performance during exploratory tests).
    - I segmented audio clips based on the ground truth in the metadata. Each segment corresponds to one respiration cycle.
 3. Train-dev-test splitting:
-  - I performed a train-dev-test split while stratifying by chest location to ensure proportional data distribution. Notably, I considered other stratifications but skipped them due to the limited data size and time constraints.
+  - I performed a train-dev-test split (Train: 60%, Dev: 20%, Test: 20%) while stratifying by chest location to ensure proportional data distribution. Notably, I considered other stratifications but skipped them due to the limited data size and time constraints.
   - Each participant appears in only one subset to prevent the model from recognizing participants instead of detecting anomalies.  
 4. Model training:
   - I used an AST encoder (`MIT/ast-finetuned-audioset-14-14-0.443`) with this simple head (mean pooling, relu, dropout, and linear classifier).
