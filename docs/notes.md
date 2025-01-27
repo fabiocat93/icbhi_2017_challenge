@@ -1,1 +1,72 @@
-# TODO
+## Notes
+
+The data describes whether an audio clip contains anomalies or not. Hence, I framed the project as an audio classification problem. I considered four scenarios:
+1. **Normal vs abnormal**: A binary classification problem.
+2. **Wheeze vs crackle vs both**: A multi-label classification problem.
+3. **None vs weeze vs crackle vs both**: A multi-label classification problem.
+4. **Diagnosis**: A multi-class classification problem.
+
+I decided to focus on **scenario 3**. It combines both tasks 1 and 2 and can provide some explainability insights, which can help address task 4 in the future. I trained a single model to predict two binary labels: the presence or absence of crackles and wheezes. I could have used hierarchical models (one for normal vs abnormal and then another for wheeze vs crackle vs both) or separate binary classifiers for crackles and wheezes. But I chose a multi-label solution because it often works better, as shown in other domains like [voice type classification](https://arxiv.org/abs/2005.12656).
+
+---
+
+1. As an exploration, I analyzed the dataset using scripts `s00_audio_summary.py` and `s01_plot_spectrogram.ipynb`. Among other things, I notices that: 
+   - The sampling rate of recordings varies from **4 kHz to 44.1 kHz**.  
+   - Some samples (especially 100% of Litt3200 device samples) had blank regions above the 2000 Hz frequency range.
+2. Preprocessing: 
+   - I re-sampled all recordings to **16 kHz** (which is the sampling rate of the encoder I used in my model).  
+   - I applied a **4th-order Butterworth low-pass filter** to reduce the impact of blank regions above 2000 Hz. (Notably: this preprocessing improved the model’s performance during exploratory tests).
+   - I segmented audio clips based on the ground truth in the metadata. Each segment corresponds to one respiration cycle.
+3. Train-dev-test splitting:
+  - I performed a train-dev-test split while **stratifying by chest location** to ensure proportional data distribution. Notably, I considered other stratifications but skipped them due to the limited data size and time constraints.
+  - Each participant appears in only one subset to prevent the model from recognizing participants instead of detecting anomalies.  
+4. Model training:
+  - I used an **AST encoder** (`MIT/ast-finetuned-audioset-14-14-0.443`) with this simple head (mean pooling, relu, dropout, and linear classifier).
+  - I froze the encoder completely. Partial freezing caused overfitting, probably due to the small dataset and limited variability.
+  - I evaluated AUDIOMAE as an alternative encoder but saw no significant performance difference, so I kept the AST encoder for simplicity. AST processes mel-spectrograms, which mimic the human auditory system (logarithmic frequency bands). Since this is not proper speech (no words), I wanted a model focusing on spectral variations rather than language features.
+  - As loss function, I used nn.BCEWithLogitsLoss(), which is good for multi-label classification because it handles independent binary predictions for each label.
+  - I applied different types of data augmentation (both showed some improvements in the performance and robustness of the model):
+    -  Signal processing-based: gain adjustment and time shifting.
+    -  Concatenation-based: I concatenated cycles to increase data for positive wheeze labels.
+  -  I used early stopping to avoid overfitting and tracked training loss with W&B.
+  -  I didn’t optimize hyperparameters (e.g., learning rate) due to time constraints. I would use Optuna to minimize validation loss in future experiments.
+5. Evaluation
+  - I measured performance using F1-score, precision, recall, area under the curve (AUC), and evaluated each label separately.
+  - I also aggregated results using macro and micro averages.
+  - The best model is available [here](https://huggingface.co/fabiocat/icbhi_classification/).
+  - You can use `s05_inference.py` for inference. The script outputs scores for crackle and wheeze labels.
+
+---
+
+## Performance:
+
+```json
+{
+  "label_specific": {
+    "label_Crackle": {
+      "f1_score": 0.6756,
+      "precision": 0.6147,
+      "recall": 0.75,
+      "roc_auc": 0.7033
+    },
+    "label_Wheeze": {
+      "f1_score": 0.4853,
+      "precision": 0.6565,
+      "recall": 0.3849,
+      "roc_auc": 0.8031
+    }
+  },
+  "aggregated": {
+    "f1_macro": 0.5805,
+    "precision_macro": 0.6356,
+    "recall_macro": 0.5674,
+    "f1_micro": 0.6282,
+    "precision_micro": 0.6223,
+    "recall_micro": 0.6342,
+    "auc_macro": 0.7532,
+    "auc_micro": 0.7875
+  }
+}
+```
+
+
