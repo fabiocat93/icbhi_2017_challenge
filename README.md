@@ -3,6 +3,8 @@ This repository provides code for pre-processing, training, and testing a model 
 For some detailed notes on the design choices and the process, please check [this notebook](docs/notes.md). 
 For the model, please visit [HuggingFace](https://huggingface.co/fabiocat/icbhi_classification).
 
+⚠️ This is just a first exploration. There is a lot more to analyze and improve. If you're interested, let's collaborate and maybe turn it into a paper! 🚀
+
 ## Repo structure
 ```
 icbhi_2017_challenge/
@@ -76,3 +78,5 @@ poetry run pre-commit run --all-files
 ```bash
 poetry run pdoc src/code -t docs_style/pdoc-theme --docformat google
 ```
+
+<img width="1727" alt="Screenshot 2025-01-27 at 12 17 40 PM" src="https://github.com/user-attachments/assets/3d3eb2e0-c2ad-4a66-8260-7c080df2e26d" />
